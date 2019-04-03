@@ -2,6 +2,7 @@
 //Generalized by Thryrallo
 
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -94,13 +95,42 @@ public class ThryEditor : ShaderGUI
 
             return display;
         }
+
+        public static PoiToonHeader Foldout(ShaderHeader header)
+        {
+            var style = new GUIStyle("ShurikenModuleTitle");
+            style.font = new GUIStyle(EditorStyles.label).font;
+            style.border = new RectOffset(15, 7, 4, 4);
+            style.fixedHeight = 22;
+            style.contentOffset = new Vector2(20f, -2f);
+            style.margin.left = 30 * header.xOffset;
+
+            var rect = GUILayoutUtility.GetRect(16f + 20f, 22f, style);
+            GUI.Box(rect, header.name, style);
+
+            var e = Event.current;
+
+            var toggleRect = new Rect(rect.x + 4f, rect.y + 2f, 13f, 13f);
+            if (e.type == EventType.Repaint)
+            {
+                EditorStyles.foldout.Draw(toggleRect, false, false, header.header.getState(), false);
+            }
+
+            if (e.type == EventType.MouseDown && rect.Contains(e.mousePosition))
+            {
+                header.header.Toggle();
+                e.Use();
+            }
+
+            return header.header;
+        }
     }
 
     GUIStyle m_sectionStyle;
 
     private class ShaderPart
     {
-
+        public int xOffset = 0;
     }
 
     private class ShaderHeader : ShaderPart
@@ -118,6 +148,11 @@ public class ThryEditor : ShaderGUI
         {
             this.header = new PoiToonHeader(materialEditor, prop.name); ;
             this.name = prop.displayName;
+        }
+
+        public ShaderHeader(MaterialProperty prop, MaterialEditor materialEditor, int xOffset) : this(prop,materialEditor)
+        {
+            this.xOffset = xOffset;
         }
 
         public void addPart(ShaderPart part)
@@ -143,30 +178,67 @@ public class ThryEditor : ShaderGUI
             this.materialProperty = materialProperty;
             this.style = new GUIContent(materialProperty.displayName, materialProperty.name + materialProperty.type);
         }
+
+        public ShaderProperty(MaterialProperty materialProperty, int xOffset) : this(materialProperty)
+        {
+            this.xOffset = xOffset;
+        }
     }
 
-    List<ShaderPart> shaderparts;
+    ShaderHeader shaderparts;
+
+    public static int propertyOptionToInt(string optionName,string name)
+    {
+        string pattern = @"-"+ optionName + "=\\d+";
+        Match match = Regex.Match(name, pattern);
+        if (match.Success) {
+            int ret = 0;
+            string value = match.Value.Replace("-" + optionName+"=", "");
+            int.TryParse(value, out ret);
+            return ret;
+        }
+        return 0;
+    }
+
 
     private void CollectAllProperties(MaterialProperty[] props, MaterialEditor materialEditor)
     {
-        shaderparts = new List<ShaderPart>();
-        ShaderHeader currentHeader = null;
+        shaderparts = new ShaderHeader(null);
+        Stack<ShaderHeader> headerStack = new Stack<ShaderHeader>();
+        headerStack.Push(shaderparts);
+        headerStack.Push(shaderparts);
+        int headerCount = 0;
         for (int i = 0; i < props.Length; i++)
         {
             //Debug.Log("Name: "+ props[i].name +",Display Name: " +props[i].displayName+ ",flags: "+ props[i].flags+",type: "+props[i].type);
-            if (props[i].name.StartsWith("m_") && props[i].flags == MaterialProperty.PropFlags.HideInInspector)
+            if (props[i].name.StartsWith("m_end") && props[i].flags == MaterialProperty.PropFlags.HideInInspector)
+            {
+                headerStack.Pop();
+                headerCount--;
+            }
+            else if (props[i].name.StartsWith("m_start") && props[i].flags == MaterialProperty.PropFlags.HideInInspector)
             {
                 //Debug.Log("Header: " + props[i].displayName);
-                ShaderHeader newHeader = new ShaderHeader(props[i], materialEditor);
-                currentHeader = newHeader;
-                shaderparts.Add(currentHeader);
+                headerCount++;
+                ShaderHeader newHeader = new ShaderHeader(props[i], materialEditor, headerCount);
+                headerStack.Peek().addPart(newHeader);
+                headerStack.Push(newHeader);
+            }
+            else if (props[i].name.StartsWith("m_") && props[i].flags == MaterialProperty.PropFlags.HideInInspector)
+            {
+                //Debug.Log("Header: " + props[i].displayName);
+                ShaderHeader newHeader = new ShaderHeader(props[i], materialEditor, headerCount);
+                headerStack.Pop();
+                headerStack.Peek().addPart(newHeader);
+                headerStack.Push(newHeader); 
             }
             else if (props[i].flags != MaterialProperty.PropFlags.HideInInspector)
             {
                 //Debug.Log("Property: " + props[i].displayName);
-                ShaderProperty newPorperty = new ShaderProperty(props[i]);
-                if (currentHeader != null) { currentHeader.addPart(newPorperty); }
-                else { shaderparts.Add(newPorperty); }
+                int extraOffset = 0;
+                extraOffset = propertyOptionToInt("extraOffset",props[i].displayName);
+                ShaderProperty newPorperty = new ShaderProperty(props[i], headerCount+ extraOffset);
+                headerStack.Peek().addPart(newPorperty);
             }
 
         }
@@ -232,7 +304,7 @@ public class ThryEditor : ShaderGUI
 
     void drawShaderHeader(ShaderHeader header, MaterialEditor materialEditor)
     {
-        header.header = PoiToonUI.Foldout(header.name, header.header);
+        header.header = PoiToonUI.Foldout(header);
         if (header.header.getState())
         {
             EditorGUILayout.Space();
@@ -246,7 +318,8 @@ public class ThryEditor : ShaderGUI
 
     void drawShaderProperty(ShaderProperty property, MaterialEditor materialEditor)
     {
-        materialEditor.ShaderProperty(property.materialProperty, property.style);
+        //materialEditor.ShaderProperty(property.materialProperty, property.style);
+        materialEditor.ShaderProperty(property.materialProperty, property.style.text, property.xOffset*2+1);
     }
 
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] props)
@@ -260,7 +333,7 @@ public class ThryEditor : ShaderGUI
 
         DrawMasterLabel(FindProperty("shader_name", props).displayName);
 
-        foreach (ShaderPart part in shaderparts)
+        foreach (ShaderPart part in shaderparts.parts)
         {
             drawShaderPart(part, materialEditor);
         }

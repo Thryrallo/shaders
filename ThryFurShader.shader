@@ -11,6 +11,11 @@ Shader "Thry/Fur"
 		_Color("Color", color) = (1,1,1,0)
 		_BrightnessMulti("Shadow Baked",Range(0,1)) = 0
 
+		/*[HideInInspector] m_start_emissionOptions("Emission Options", Float) = 0
+		_EmissionColor("Emission Color",color) = (1,1,1,1)
+		_EmissionStrength("Emission Strength",Float) = 0
+		[HideInInspector] m_end_emissionOptions("Emission Options", Float) = 0*/
+
 		[HideInInspector] m_furOptions("Fur Options", Float) = 0
 		_DispTex("Disp Texture", 2D) = "gray" {}
 		_Displacement("Displacement", Range(0, 1.0)) = 0.3
