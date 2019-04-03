@@ -331,7 +331,12 @@ public class ThryEditor : ShaderGUI
         // load default toggle values
         LoadDefaults(material);
 
-        DrawMasterLabel(FindProperty("shader_name", props).displayName);
+        string shaderName = null;
+        foreach(MaterialProperty p in props)
+        {
+            if(p.name== "shader_name") { shaderName = p.displayName; }
+        }
+        if(shaderName!=null) DrawMasterLabel(shaderName);
 
         foreach (ShaderPart part in shaderparts.parts)
         {
