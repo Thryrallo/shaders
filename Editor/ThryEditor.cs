@@ -128,6 +128,8 @@ public class ThryEditor : ShaderGUI
 
     GUIStyle m_sectionStyle;
 
+    public static string EXTRA_OFFSET_OPTION = "extraOffset";
+
     private class ShaderPart
     {
         public int xOffset = 0;
@@ -179,18 +181,20 @@ public class ThryEditor : ShaderGUI
             this.style = new GUIContent(materialProperty.displayName, materialProperty.name + materialProperty.type);
         }
 
-        public ShaderProperty(MaterialProperty materialProperty, int xOffset) : this(materialProperty)
+        public ShaderProperty(MaterialProperty materialProperty, string displayName, int xOffset)
         {
             this.xOffset = xOffset;
+            this.materialProperty = materialProperty;
+            this.style = new GUIContent(displayName , materialProperty.name + materialProperty.type);
         }
     }
 
     ShaderHeader shaderparts;
 
-    public static int propertyOptionToInt(string optionName,string name)
+    public static int propertyOptionToInt(string optionName, MaterialProperty p)
     {
         string pattern = @"-"+ optionName + "=\\d+";
-        Match match = Regex.Match(name, pattern);
+        Match match = Regex.Match(p.displayName, pattern);
         if (match.Success) {
             int ret = 0;
             string value = match.Value.Replace("-" + optionName+"=", "");
@@ -199,7 +203,6 @@ public class ThryEditor : ShaderGUI
         }
         return 0;
     }
-
 
     private void CollectAllProperties(MaterialProperty[] props, MaterialEditor materialEditor)
     {
@@ -236,8 +239,9 @@ public class ThryEditor : ShaderGUI
             {
                 //Debug.Log("Property: " + props[i].displayName);
                 int extraOffset = 0;
-                extraOffset = propertyOptionToInt("extraOffset",props[i].displayName);
-                ShaderProperty newPorperty = new ShaderProperty(props[i], headerCount+ extraOffset);
+                extraOffset = propertyOptionToInt(EXTRA_OFFSET_OPTION, props[i]);
+                string displayName = props[i].displayName.Replace("-"+ EXTRA_OFFSET_OPTION+"="+ extraOffset, "");
+                ShaderProperty newPorperty = new ShaderProperty(props[i], displayName, headerCount+ extraOffset);
                 headerStack.Peek().addPart(newPorperty);
             }
 
