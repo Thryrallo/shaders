@@ -1,4 +1,4 @@
-Thrys Shaders
+<h2>Thrys Shaders<h2>
 
 includes:
 - Fur Shader
