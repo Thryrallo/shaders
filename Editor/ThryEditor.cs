@@ -68,33 +68,6 @@ public class ThryEditor : ShaderGUI
 
     private static class PoiToonUI
     {
-        public static PoiToonHeader Foldout(string title, PoiToonHeader display)
-        {
-            var style = new GUIStyle("ShurikenModuleTitle");
-            style.font = new GUIStyle(EditorStyles.label).font;
-            style.border = new RectOffset(15, 7, 4, 4);
-            style.fixedHeight = 22;
-            style.contentOffset = new Vector2(20f, -2f);
-
-            var rect = GUILayoutUtility.GetRect(16f, 22f, style);
-            GUI.Box(rect, title, style);
-
-            var e = Event.current;
-
-            var toggleRect = new Rect(rect.x + 4f, rect.y + 2f, 13f, 13f);
-            if (e.type == EventType.Repaint)
-            {
-                EditorStyles.foldout.Draw(toggleRect, false, false, display.getState(), false);
-            }
-
-            if (e.type == EventType.MouseDown && rect.Contains(e.mousePosition))
-            {
-                display.Toggle();
-                e.Use();
-            }
-
-            return display;
-        }
 
         public static PoiToonHeader Foldout(ShaderHeader header)
         {
@@ -152,7 +125,7 @@ public class ThryEditor : ShaderGUI
             this.name = prop.displayName;
         }
 
-        public ShaderHeader(MaterialProperty prop, MaterialEditor materialEditor, int xOffset) : this(prop,materialEditor)
+        public ShaderHeader(MaterialProperty prop, MaterialEditor materialEditor, int xOffset) : this(prop, materialEditor)
         {
             this.xOffset = xOffset;
         }
@@ -185,7 +158,7 @@ public class ThryEditor : ShaderGUI
         {
             this.xOffset = xOffset;
             this.materialProperty = materialProperty;
-            this.style = new GUIContent(displayName , materialProperty.name + materialProperty.type);
+            this.style = new GUIContent(displayName, materialProperty.name + materialProperty.type);
         }
     }
 
@@ -193,11 +166,12 @@ public class ThryEditor : ShaderGUI
 
     public static int propertyOptionToInt(string optionName, MaterialProperty p)
     {
-        string pattern = @"-"+ optionName + "=\\d+";
+        string pattern = @"-" + optionName + "=\\d+";
         Match match = Regex.Match(p.displayName, pattern);
-        if (match.Success) {
+        if (match.Success)
+        {
             int ret = 0;
-            string value = match.Value.Replace("-" + optionName+"=", "");
+            string value = match.Value.Replace("-" + optionName + "=", "");
             int.TryParse(value, out ret);
             return ret;
         }
@@ -233,15 +207,15 @@ public class ThryEditor : ShaderGUI
                 ShaderHeader newHeader = new ShaderHeader(props[i], materialEditor, headerCount);
                 headerStack.Pop();
                 headerStack.Peek().addPart(newHeader);
-                headerStack.Push(newHeader); 
+                headerStack.Push(newHeader);
             }
             else if (props[i].flags != MaterialProperty.PropFlags.HideInInspector)
             {
                 //Debug.Log("Property: " + props[i].displayName);
                 int extraOffset = 0;
                 extraOffset = propertyOptionToInt(EXTRA_OFFSET_OPTION, props[i]);
-                string displayName = props[i].displayName.Replace("-"+ EXTRA_OFFSET_OPTION+"="+ extraOffset, "");
-                ShaderProperty newPorperty = new ShaderProperty(props[i], displayName, headerCount+ extraOffset);
+                string displayName = props[i].displayName.Replace("-" + EXTRA_OFFSET_OPTION + "=" + extraOffset, "");
+                ShaderProperty newPorperty = new ShaderProperty(props[i], displayName, headerCount + extraOffset);
                 headerStack.Peek().addPart(newPorperty);
             }
 
@@ -289,7 +263,7 @@ public class ThryEditor : ShaderGUI
         style.richText = true;
         style.alignment = TextAnchor.MiddleCenter;
 
-        EditorGUILayout.LabelField("<size=18><color=#00339B>" + shaderName + " </color></size>", style, GUILayout.MinHeight(16));
+        EditorGUILayout.LabelField("<size=16>" + shaderName + "</size>", style, GUILayout.MinHeight(18));
     }
 
     void drawShaderPart(ShaderPart part, MaterialEditor materialEditor)
@@ -320,15 +294,51 @@ public class ThryEditor : ShaderGUI
         }
     }
 
+    public Dictionary<string, bool> showTextureScaleOffset = new Dictionary<string, bool>();
+
     void drawShaderProperty(ShaderProperty property, MaterialEditor materialEditor)
     {
         //materialEditor.ShaderProperty(property.materialProperty, property.style);
-        materialEditor.ShaderProperty(property.materialProperty, property.style.text, property.xOffset*2+1);
+        if (property.materialProperty.type == MaterialProperty.PropType.Texture)
+        {
+            int oldIndentLevel = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = property.xOffset * 2 + 1;
+            Rect rect = materialEditor.TexturePropertySingleLine(new GUIContent(property.materialProperty.displayName, "Click here for scale / offset"), property.materialProperty);
+
+            var e = Event.current;
+            bool value = false;
+            if (e.type == EventType.MouseDown && rect.Contains(e.mousePosition))
+            {
+                if (showTextureScaleOffset.TryGetValue(property.materialProperty.name, out value))
+                {
+                    showTextureScaleOffset.Remove(property.materialProperty.name);
+                }
+                value = !value;
+                showTextureScaleOffset.Add(property.materialProperty.name, value);
+
+                e.Use();
+            }
+            if (!showTextureScaleOffset.TryGetValue(property.materialProperty.name, out value))
+            {
+                value = false;
+            }
+            if (value) materialEditor.TextureScaleOffsetProperty(property.materialProperty);
+
+            EditorGUI.indentLevel = oldIndentLevel;
+        }
+        else
+        {
+            materialEditor.ShaderProperty(property.materialProperty, property.style.text, property.xOffset * 2 + 1);
+        }
     }
+
+    public bool test = false;
 
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] props)
     {
         Material material = materialEditor.target as Material;
+
+        SetupStyle();
 
         CollectAllProperties(props, materialEditor);
 
@@ -336,11 +346,11 @@ public class ThryEditor : ShaderGUI
         LoadDefaults(material);
 
         string shaderName = null;
-        foreach(MaterialProperty p in props)
+        foreach (MaterialProperty p in props)
         {
-            if(p.name== "shader_name") { shaderName = p.displayName; }
+            if (p.name == "shader_name") { shaderName = p.displayName; }
         }
-        if(shaderName!=null) DrawMasterLabel(shaderName);
+        if (shaderName != null) DrawMasterLabel(shaderName);
 
         foreach (ShaderPart part in shaderparts.parts)
         {
